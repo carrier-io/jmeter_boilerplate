@@ -36,18 +36,18 @@ parameters:
     type: boolean
   - name: poolName
     displayName: Pool Name
-    default: 'ubuntu'
+    default: $(PoolName)
     type: string
- - name: token
-   displayName: Token
-   default: $(MySecretToken)
-   type: string
+  - name: token
+    displayName: Token
+    default: $(MySecretToken)
+    type: string
 
 # Stages
 stages:
   - stage: Server_Side
     pool:
-      name:  ${{ parameters.poolName }}
+      name: ${{ parameters.poolName }}
     displayName: PerfTest_Server_Side
 
     # Jobs
