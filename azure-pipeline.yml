@@ -38,6 +38,10 @@ parameters:
     displayName: Pool Name
     default: 'ubuntu'
     type: string
+ - name: token
+   displayName: Token
+   default: $(MySecretToken)
+   type: string
 
 # Stages
 stages:
@@ -60,7 +64,7 @@ stages:
               targetType: 'inline'
               script: |
                 mkdir reports
-                docker run --rm -u=root -v $(Build.SourcesDirectory)/reports:/tmp/reports  -v $(Build.SourcesDirectory)/tests:/mnt/jmeter/ -e JVM_ARGS='${{ variables.JVM_ARGS }}' -e junit_report="{{ variables.JUNIT }}" getcarrier/perfmeter:latest -n -t /mnt/jmeter/${{ parameters.TEST }}.jmx -JVUSERS=${{ parameters.VUSERS }} -JRAMP_UP=${{ parameters.RAMP_UP }} -JTHINK_TIME=${{ parameters.THINK_TIME }} -JTHINK_TIME_DEVIATION=${{ parameters.THINK_TIME_DEVIATION }} -JDURATION=${{ parameters.DURATION }} -JENVIRONMENT=${{ parameters.ENV_URL }} -JTOKEN=${{ parameters.token }} -Jjmeter.reportgenerator.overall_granularity={{ variables.AGGREGATION }}
+                docker run --rm -u=root -v $(Build.SourcesDirectory)/reports:/tmp/reports  -v $(Build.SourcesDirectory)/tests:/mnt/jmeter/ -e JVM_ARGS='${{ variables.JVM_ARGS }}' -e junit_report="{{ variables.JUNIT }}" getcarrier/perfmeter:latest -n -t /mnt/jmeter/${{ parameters.TEST }}.jmx -JVUSERS=${{ parameters.VUSERS }} -JRAMP_UP=${{ parameters.RAMP_UP }} -JTHINK_TIME=${{ parameters.THINK_TIME }} -JTHINK_TIME_DEVIATION=${{ parameters.THINK_TIME_DEVIATION }} -JDURATION=${{ parameters.DURATION }} -JENVIRONMENT=${{ parameters.ENV_URL }} -JTOKEN=${{ parameters.token }} -Jjmeter.reportgenerator.overall_granularity=${{ variables.AGGREGATION }}
 
                 # List report files
                 ls -la reports
