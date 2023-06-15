@@ -17,7 +17,7 @@ parameters:
     default: 'karens.pythonanywhere.com'
     type: string
   - name: VUSERS
-    default: 300
+    default: 10
     type: number
   - name: DURATION
     default: 300
