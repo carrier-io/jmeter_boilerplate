@@ -1,0 +1,85 @@
+# Trigger the pipeline when changes are pushed to the 'develop' branch
+trigger:
+  - develop
+
+# Pipeline Variables
+variables:
+  JVM_ARGS: '-Xms1g -Xmx4g'
+  JUNIT: 'True'
+  AGGREGATION: '10000'
+
+# Parameter Definitions
+parameters:
+  - name: TEST
+    default: 'mixed'
+    type: string
+  - name: ENV_URL
+    default: 'karens.pythonanywhere.com'
+    type: string
+  - name: VUSERS
+    default: 10
+    type: number
+  - name: DURATION
+    default: 300
+    type: number
+  - name: RAMP_UP
+    default: 30
+    type: number
+  - name: THINK_TIME
+    default: 5000
+    type: number
+  - name: THINK_TIME_DEVIATION
+    default: 5000
+    type: number
+  - name: generateReport
+    default: true
+    type: boolean
+  - name: poolName
+    displayName: Pool Name
+    default: $(PoolName)
+    type: string
+  - name: token
+    displayName: Token
+    default: $(MySecretToken)
+    type: string
+
+# Stages
+stages:
+  - stage: Server_Side
+    pool:
+      name: ${{ parameters.poolName }}
+    displayName: PerfTest_Server_Side
+
+    # Jobs
+    jobs:
+      - job: PerfTest
+        timeoutInMinutes: 90 # Set a timeout of 90 mins to cancel the job automatically if it exceeds the limit
+        displayName: PerfTest
+
+        # Steps
+        steps:
+          # Run the performance test using Carrier Docker container with the provided parameters
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: |
+                mkdir reports
+                docker run --rm -u=root -v $(Build.SourcesDirectory)/reports:/tmp/reports  -v $(Build.SourcesDirectory)/tests:/mnt/jmeter/ -e JVM_ARGS='${{ variables.JVM_ARGS }}' -e junit_report="{{ variables.JUNIT }}" getcarrier/perfmeter:latest -n -t /mnt/jmeter/${{ parameters.TEST }}.jmx -JVUSERS=${{ parameters.VUSERS }} -JRAMP_UP=${{ parameters.RAMP_UP }} -JTHINK_TIME=${{ parameters.THINK_TIME }} -JTHINK_TIME_DEVIATION=${{ parameters.THINK_TIME_DEVIATION }} -JDURATION=${{ parameters.DURATION }} -JENVIRONMENT=${{ parameters.ENV_URL }} -JTOKEN=${{ parameters.token }} -Jjmeter.reportgenerator.overall_granularity=${{ variables.AGGREGATION }}
+
+                # List report files
+                ls -la reports
+                sudo chmod -R 777 $(Build.SourcesDirectory)
+
+          # Publish Test Results
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'reports/jmeter.xml'
+
+          # Publish Pipeline Artifact (JMeter Report)
+          - task: PublishPipelineArtifact@1
+            displayName: Publish JMeter Report
+            condition: and(always(), eq('${{ parameters.generateReport }}', 'true'))
+            inputs:
+              targetPath: reports
+              artifact: jmeter
