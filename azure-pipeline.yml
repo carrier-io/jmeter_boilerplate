@@ -38,6 +38,18 @@ parameters:
     displayName: Pool Name
     default: $(PoolName)
     type: string
+   - name: RT_THRESHOLD
+    default: 5000
+    type: number
+    displayName: Threshold for response time by 95th pct (ms)
+  - name: ER_THRESHOLD
+    default: 1
+    type: number
+    displayName: Threshold for error rate (%)
+  - name: TP_THRESHOLD
+    default: 5
+    type: number
+    displayName: Threshold for avg throughput (req/sec)
   - name: token
     displayName: Token
     default: $(MySecretToken)
@@ -63,9 +75,15 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
+                # Intercept test break to reset folder chmod and stops docker containers
+                function cleanup {
+                  sudo chmod -R 777 $(Build.SourcesDirectory)
+                  docker stop $(docker ps -q)
+                }
+                trap cleanup EXIT
                 mkdir reports
-                docker run --rm -u=root -v $(Build.SourcesDirectory)/reports:/tmp/reports  -v $(Build.SourcesDirectory)/tests:/mnt/jmeter/ -e JVM_ARGS='${{ variables.JVM_ARGS }}' -e junit_report="{{ variables.JUNIT }}" getcarrier/perfmeter:latest -n -t /mnt/jmeter/${{ parameters.TEST }}.jmx -JVUSERS=${{ parameters.VUSERS }} -JRAMP_UP=${{ parameters.RAMP_UP }} -JTHINK_TIME=${{ parameters.THINK_TIME }} -JTHINK_TIME_DEVIATION=${{ parameters.THINK_TIME_DEVIATION }} -JDURATION=${{ parameters.DURATION }} -JENVIRONMENT=${{ parameters.ENV_URL }} -JTOKEN=${{ parameters.token }} -Jjmeter.reportgenerator.overall_granularity=${{ variables.AGGREGATION }}
-
+                docker run --rm -v $(Build.SourcesDirectory)/report:/tmp/reports  -v $(Build.SourcesDirectory)/tests:/mnt/jmeter/ -e JVM_ARGS='${{ variables.JVM_ARGS }}' -e rt=${{ parameters.RT_THRESHOLD }} -e er=${{ parameters.ER_THRESHOLD }} -e tp=${{ parameters.TP_THRESHOLD }} -e junit_report="{{ variables.JUNIT }}" getcarrier/perfmeter:standalone -n -t /mnt/jmeter/${{ parameters.TEST }}.jmx -JVUSERS=${{ parameters.VUSERS }} -JRAMP_UP=${{ parameters.RAMP_UP }} -JTHINK_TIME=${{ parameters.THINK_TIME }} -JTHINK_TIME_DEVIATION=${{ parameters.THINK_TIME_DEVIATION }} -JDURATION=${{ parameters.DURATION }} -JTOKEN=${{ parameters.token }} - -JENVIRONMENT=${{ parameters.ENV_URL }} -Jjmeter.reportgenerator.overall_granularity=${{ variables.AGGREGATION }}
+                sed -ri 's/(JMeter property: PWD=)([^[:space:]]*)/\1*****/g' report/jmeter_logs.log
                 # List report files
                 ls -la reports
                 sudo chmod -R 777 $(Build.SourcesDirectory)
@@ -74,7 +92,7 @@ stages:
           - task: PublishTestResults@2
             inputs:
               testResultsFormat: 'JUnit'
-              testResultsFiles: 'reports/jmeter.xml'
+              testResultsFiles: 'report/jmeter.xml'
 
           # Publish Pipeline Artifact (JMeter Report)
           - task: PublishPipelineArtifact@1
